@@ -22,7 +22,9 @@ from pytest import fixture, param, skip, exit
 from testcontainers.core.container import DockerContainer
 from gremlin_python.process.anonymous_traversal import traversal
 from gremlin_python.driver.driver_remote_connection import DriverRemoteConnection
-from janusgraph_python.driver.serializer import JanusGraphSONSerializersV3d0
+from janusgraph_python.driver.serializer import JanusGraphSONSerializersV3d0, JanusGraphBinarySerializersV1
+
+from gremlin_python.driver.serializer import GraphBinarySerializersV1
 
 current_path = pathlib.Path(__file__).parent.resolve()
 JANUSGRAPH_REPOSITORY = None
@@ -86,6 +88,27 @@ def graph_connection_graphson(request, graph_container):
     # to the graph_container fixture
     container = graph_container(request)
     return graph_connection(request, container, JanusGraphSONSerializersV3d0())
+
+@fixture(scope='session')
+def graph_connection_graphbinary(request):
+    connection = DriverRemoteConnection(
+        f'ws://localhost:8182/gremlin',
+        'gp_traversal',
+        message_serializer=JanusGraphBinarySerializersV1(),
+        #message_serializer=GraphBinarySerializersV1(),
+        username="jg_user",
+        password="jg_password"
+    )
+
+    def close_connection():
+        connection.close()
+
+    request.addfinalizer(close_connection)
+
+    g = traversal().with_remote(connection)
+
+    return g
+
 
 def graph_connection(request, graph_container, serializer):
     """
