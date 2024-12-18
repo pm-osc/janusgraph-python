@@ -90,24 +90,35 @@ def graph_connection_graphson(request, graph_container):
     return graph_connection(request, container, JanusGraphSONSerializersV3d0())
 
 @fixture(scope='session')
-def graph_connection_graphbinary(request):
-    connection = DriverRemoteConnection(
-        f'ws://localhost:8182/gremlin',
-        'gp_traversal',
-        message_serializer=JanusGraphBinarySerializersV1(),
-        #message_serializer=GraphBinarySerializersV1(),
-        username="jg_user",
-        password="jg_password"
-    )
+def graph_connection_graphbinary(request, graph_container):
+    """
+    Fixture for creating connection with JanusGraphBinarySerializersV1 serializer
+    to the JanusGraph container
+    """
+    # NOTE: this is a workaround to be able to pass the session fixture param
+    # to the graph_container fixture
+    container = graph_container(request)
+    return graph_connection(request, container, JanusGraphBinarySerializersV1())
 
-    def close_connection():
-        connection.close()
+# @fixture(scope='session')
+# def graph_connection_graphbinary(request):
+#     connection = DriverRemoteConnection(
+#         f'ws://localhost:8182/gremlin',
+#         'gp_traversal',
+#         #message_serializer=JanusGraphBinarySerializersV1(),
+#         message_serializer=GraphBinarySerializersV1(),
+#         username="jg_user",
+#         password="jg_password"
+#     )
 
-    request.addfinalizer(close_connection)
+#     def close_connection():
+#         connection.close()
 
-    g = traversal().with_remote(connection)
+#     request.addfinalizer(close_connection)
 
-    return g
+#     g = traversal().with_remote(connection)
+
+#     return g
 
 
 def graph_connection(request, graph_container, serializer):

@@ -26,8 +26,8 @@ uint16_pack, uint16_unpack = _make_packer('>H')
 uint32_pack, uint32_unpack = _make_packer('>I')
 
 class JanusGraphDataType(Enum):
-    janusgraphp = 0x1002
-    janusgraphrelationidentifier = 0x1001
+    janusgraphp = (0x1002, "janusgraph.P")
+    janusgraphrelationidentifier = (0x1001, "janusgraph.RelationIdentifier")
 
 class JanusGraphBinaryReader(GraphBinaryReader):
     def __init__(self):
@@ -48,46 +48,36 @@ class JanusGraphBinaryWriter(GraphBinaryWriter):
 
 
 class JanusGraphPSerializer(_GraphBinaryTypeIO):
-    graphbinary_type = JanusGraphDataType.janusgraphp
+    graphbinary_type_id = JanusGraphDataType.janusgraphp.value[0]
+    graphbinary_type_name = JanusGraphDataType.janusgraphp.value[1]
     python_type = _JanusGraphP
 
     @classmethod
-    def prefix_bytes(cls, graphbin_type, as_value=False, nullable=True, to_extend=None):
-        print("HELLOKA")
+    def dictify(cls, obj, writer, to_extend, as_value=False, nullable=True):
         if to_extend is None:
             to_extend = bytearray()
 
+        # Part 1: serializing the custom JanusGraph type
         # use the custom type code
         if not as_value:
             to_extend += uint8_pack(DataType.custom.value)
 
-        # for type_info use the custom type code
-        to_extend += uint32_pack(graphbin_type.value)
+        # add the name of the custom JanusGraph type
+        StringIO.dictify(cls.graphbinary_type_name, writer, to_extend, True, False)
 
-        if nullable:
-            to_extend += int8_pack(0)
+        # add the id of the custom JanusGraph type
+        to_extend += uint32_pack(cls.graphbinary_type_id)
 
-        return to_extend
+        # Part 2: serializing the custom JanusGraph operator
+        # use the custom type code
+        if not as_value:
+            to_extend += uint8_pack(DataType.custom.value)
 
-    @classmethod
-    def dictify(cls, obj, writer, to_extend, as_value=False, nullable=True):
-        cls.prefix_bytes(cls.graphbinary_type, as_value, nullable, to_extend)
-
+        # serialize the operator
         StringIO.dictify(obj.operator, writer, to_extend, True, False)
-
-        args = []
-        if obj.other is None:
-            if isinstance(obj.value, ListType):
-                args = obj.value
-            else:
-                args.append(obj.value)
-        else:
-            args.append(obj.value)
-            args.append(obj.other)
-
-        to_extend.extend(int32_pack(len(args)))
-        for a in args:
-            writer.to_dict(a, to_extend)
+        
+        # serialize the value
+        writer.to_dict(obj.value, to_extend)
 
         return to_extend
 
